@@ -1,0 +1,625 @@
+                      (   divd_check.asm):00001         ; TEST - divd test program.
+                      (   divd_check.asm):00002         ; Unallocated sectors contain tables of randomized test data:
+                      (   divd_check.asm):00003         ; Byte 1: initial CC value
+                      (   divd_check.asm):00004         ; Byte 2: initial A value
+                      (   divd_check.asm):00005         ; Byte 3: initial B value
+                      (   divd_check.asm):00006         ; Byte 4: initial divisor
+                      (   divd_check.asm):00007         ; 
+                      (   divd_check.asm):00008         ; Results data:
+                      (   divd_check.asm):00009         ; Byte 1: resulting CC
+                      (   divd_check.asm):00010         ; Byte 2: resulting A
+                      (   divd_check.asm):00011         ; Byte 3: resulting B
+                      (   divd_check.asm):00012         
+                      (   divd_check.asm):00013             PRAGMA autobranchlength
+                      (   divd_check.asm):00014         
+     0004             (   divd_check.asm):00015         parameter_size equ 4
+     0003             (   divd_check.asm):00016         result_size equ 3
+     003F             (   divd_check.asm):00017         tests_per_sector equ 256/parameter_size-1
+     0054             (   divd_check.asm):00018         results_per_sector equ 256/result_size-1
+                      (   divd_check.asm):00019         
+                      (   divd_check.asm):00020                 org $6000
+6000                  (   divd_check.asm):00021         start
+                      (   divd_check.asm):00022         ; Load FAT
+6000 BEC006           (   divd_check.asm):00023                 ldx $c006
+6003 8602             (   divd_check.asm):00024                 lda #2     ; read operation
+6005 A784             (   divd_check.asm):00025                 sta ,x
+6007 6F01             (   divd_check.asm):00026                 clr 1,x    ; Drive #0
+6009 8611             (   divd_check.asm):00027                 lda #17    ; track number
+600B A702             (   divd_check.asm):00028                 sta 2,x
+600D 8602             (   divd_check.asm):00029                 lda #2     ; sector number
+600F A703             (   divd_check.asm):00030                 sta 3,x
+6011 108E6223         (   divd_check.asm):00031                 ldy #fat   ; Buffer address
+6015 10AF04           (   divd_check.asm):00032                 sty 4,x
+6018 6F06             (   divd_check.asm):00033                 clr 6,x    ; clear error
+601A AD9FC004         (   divd_check.asm):00034                 jsr [$c004] ; read sector
+601E 6D06             (   divd_check.asm):00035                 tst 6,x
+6020 102601E6         (   divd_check.asm):00036                 bne errors
+                      (   divd_check.asm):00037         
+                      (   divd_check.asm):00038         ; Restore both drives to track zero
+6024 BEC006           (   divd_check.asm):00039                 ldx $c006
+6027 6F84             (   divd_check.asm):00040                 clr ,x
+6029 6F01             (   divd_check.asm):00041                 clr 1,x
+602B AD9FC004         (   divd_check.asm):00042                 jsr [$c004]
+602F 6D06             (   divd_check.asm):00043                 tst 6,x
+6031 102601D5         (   divd_check.asm):00044                 bne errors
+6035 8601             (   divd_check.asm):00045                 lda #1
+6037 A701             (   divd_check.asm):00046                 sta 1,x
+6039 AD9FC004         (   divd_check.asm):00047                 jsr [$c004]
+603D 6D06             (   divd_check.asm):00048                 tst 6,x
+603F 102601C7         (   divd_check.asm):00049                 bne errors
+                      (   divd_check.asm):00050         
+                      (   divd_check.asm):00051         ; Initialize tables
+6043 8600             (   divd_check.asm):00052                 lda #0
+6045 B7621D           (   divd_check.asm):00053                 sta cur_test_track
+6048 B7621F           (   divd_check.asm):00054                 sta cur_res_track
+604B B76221           (   divd_check.asm):00055                 sta test_number
+604E B76222           (   divd_check.asm):00056                 sta result_number
+6051 8601             (   divd_check.asm):00057                 lda #1
+6053 B7621E           (   divd_check.asm):00058                 sta cur_test_sector
+6056 B76220           (   divd_check.asm):00059                 sta cur_res_sector
+                      (   divd_check.asm):00060                 
+                      (   divd_check.asm):00061         ; Load first sector of data
+                      (   divd_check.asm):00062         
+6059 BEC006           (   divd_check.asm):00063                 ldx $c006
+605C 8602             (   divd_check.asm):00064                 lda #2     ; read operation
+605E A784             (   divd_check.asm):00065                 sta ,x
+6060 6F01             (   divd_check.asm):00066                 clr 1,x    ; Drive #0
+6062 B6621D           (   divd_check.asm):00067                 lda cur_test_track    ; track number
+6065 A702             (   divd_check.asm):00068                 sta 2,x
+6067 B6621E           (   divd_check.asm):00069                 lda cur_test_sector     ; sector number
+606A A703             (   divd_check.asm):00070                 sta 3,x
+606C 108E6323         (   divd_check.asm):00071                 ldy #ps   ; Buffer address
+6070 10AF04           (   divd_check.asm):00072                 sty 4,x
+6073 6F06             (   divd_check.asm):00073                 clr 6,x    ; clear error
+6075 AD9FC004         (   divd_check.asm):00074                 jsr [$c004] ; read sector
+6079 6D06             (   divd_check.asm):00075                 tst 6,x
+607B 1026018B         (   divd_check.asm):00076                 bne errors
+                      (   divd_check.asm):00077         
+                      (   divd_check.asm):00078         ; Load first sector of results
+                      (   divd_check.asm):00079         
+607F BEC006           (   divd_check.asm):00080                 ldx $c006
+6082 8602             (   divd_check.asm):00081                 lda #2     ; read operation
+6084 A784             (   divd_check.asm):00082                 sta ,x
+6086 8601             (   divd_check.asm):00083                 lda #1
+6088 A701             (   divd_check.asm):00084                 sta 1,x    ; Drive #1
+608A B6621F           (   divd_check.asm):00085                 lda cur_res_track    ; track number
+608D A702             (   divd_check.asm):00086                 sta 2,x
+608F B66220           (   divd_check.asm):00087                 lda cur_res_sector     ; sector number
+6092 A703             (   divd_check.asm):00088                 sta 3,x
+6094 108E6423         (   divd_check.asm):00089                 ldy #rs   ; Buffer address
+6098 10AF04           (   divd_check.asm):00090                 sty 4,x
+609B 6F06             (   divd_check.asm):00091                 clr 6,x    ; clear error
+609D AD9FC004         (   divd_check.asm):00092                 jsr [$c004] ; read sector
+60A1 6D06             (   divd_check.asm):00093                 tst 6,x
+60A3 10260163         (   divd_check.asm):00094                 bne errors
+                      (   divd_check.asm):00095         
+                      (   divd_check.asm):00096         ; Load pointers and values;
+60A7 CE6323           (   divd_check.asm):00097                 ldu #ps
+60AA 10866523         (   divd_check.asm):00098                 ldw #rs+256
+60AE                  (   divd_check.asm):00099         next_test
+                      (   divd_check.asm):00100         
+                      (   divd_check.asm):00101         ;       ldx #test_number_string
+                      (   divd_check.asm):00102         ;       jsr print_string_x
+                      (   divd_check.asm):00103         ;       lda test_number
+                      (   divd_check.asm):00104         ;       jsr print_a
+                      (   divd_check.asm):00105         ;       jsr print_cr
+                      (   divd_check.asm):00106         ;       
+                      (   divd_check.asm):00107         ;       ldx #res_number_string
+                      (   divd_check.asm):00108         ;       jsr print_string_x
+                      (   divd_check.asm):00109         ;       lda result_number
+                      (   divd_check.asm):00110         ;       jsr print_a
+                      (   divd_check.asm):00111         ;       jsr print_cr
+                      (   divd_check.asm):00112                 
+                      (   divd_check.asm):00113         
+60AE 8E6526           (   divd_check.asm):00114                 ldx #compare+result_size
+60B1 3707             (   divd_check.asm):00115                 pulu cc,a,b
+                      (   divd_check.asm):00116                 
+                      (   divd_check.asm):00117         ; Perform test
+60B3 11ADC0           (   divd_check.asm):00118                 divd ,u+
+                      (   divd_check.asm):00119         
+                      (   divd_check.asm):00120         ; store results
+60B6 1E31             (   divd_check.asm):00121                 exg u,x
+60B8 3607             (   divd_check.asm):00122                 pshu cc,a,b
+60BA 1E31             (   divd_check.asm):00123                 exg u,x
+                      (   divd_check.asm):00124                 
+60BC 1CAF             (   divd_check.asm):00125                 andcc #$af
+                      (   divd_check.asm):00126                 
+                      (   divd_check.asm):00127         ; Compare this result with previous result
+60BE C603             (   divd_check.asm):00128                 ldb #result_size
+60C0 8E6526           (   divd_check.asm):00129                 ldx #compare+result_size
+60C3 1F62             (   divd_check.asm):00130                 tfr w,y
+60C5 12               (   divd_check.asm):00131                 nop
+60C6                  (   divd_check.asm):00132         compare_loop
+60C6 A6A2             (   divd_check.asm):00133                 lda ,-y
+60C8 A182             (   divd_check.asm):00134                 cmpa ,-x
+60CA 10260496         (   divd_check.asm):00135                 bne compare_fail
+60CE 5A               (   divd_check.asm):00136                 decb
+60CF 26F5             (   divd_check.asm):00137                 bne compare_loop
+60D1 1E62             (   divd_check.asm):00138                 exg w,y
+                      (   divd_check.asm):00139                 
+                      (   divd_check.asm):00140         ; account for test
+                      (   divd_check.asm):00141                 
+                      (   divd_check.asm):00142         ;       inc $400
+                      (   divd_check.asm):00143         ;       ldx #one_suc_string
+                      (   divd_check.asm):00144         ;       jsr print_string_x
+                      (   divd_check.asm):00145         
+60D3 7C6221           (   divd_check.asm):00146                 inc test_number
+60D6 7C6222           (   divd_check.asm):00147                 inc result_number
+                      (   divd_check.asm):00148                 
+                      (   divd_check.asm):00149         ; check if results sector is empty
+60D9 B66222           (   divd_check.asm):00150                 lda result_number
+60DC 8154             (   divd_check.asm):00151                 cmpa #results_per_sector
+60DE 102F0003         (   divd_check.asm):00152                 ble >
+60E2 1700AA           (   divd_check.asm):00153                 bsr read_new_results
+                      (   divd_check.asm):00154                 
+                      (   divd_check.asm):00155         ; check if parameters on this sector are all consumed
+                      (   divd_check.asm):00156         !
+60E5 B66221           (   divd_check.asm):00157                 lda test_number
+60E8 813F             (   divd_check.asm):00158                 cmpa #tests_per_sector
+60EA 102F0003         (   divd_check.asm):00159                 ble >
+60EE 170002           (   divd_check.asm):00160                 bsr read_next_parameters
+                      (   divd_check.asm):00161                 
+                      (   divd_check.asm):00162         ; repeat
+                      (   divd_check.asm):00163         !
+60F1 20BB             (   divd_check.asm):00164                 bra next_test
+                      (   divd_check.asm):00165                 
+                      (   divd_check.asm):00166         ; Load next testing sector
+60F3                  (   divd_check.asm):00167         read_next_parameters
+                      (   divd_check.asm):00168         
+                      (   divd_check.asm):00169         ; Increment to next sector
+60F3 B6621E           (   divd_check.asm):00170                 lda cur_test_sector
+60F6 8112             (   divd_check.asm):00171                 cmpa #18
+60F8 10270007         (   divd_check.asm):00172                 beq >     ; go increment track
+60FC 4C               (   divd_check.asm):00173                 inca
+60FD B7621E           (   divd_check.asm):00174                 sta cur_test_sector
+6100 160012           (   divd_check.asm):00175                 bra check_inside_directory
+                      (   divd_check.asm):00176         !
+6103 8601             (   divd_check.asm):00177                 lda #1
+6105 B7621E           (   divd_check.asm):00178                 sta cur_test_sector
+                      (   divd_check.asm):00179         ; increment to next track
+6108 B6621D           (   divd_check.asm):00180                 lda cur_test_track
+610B                  (   divd_check.asm):00181         increment_track
+610B 4C               (   divd_check.asm):00182                 inca
+610C 8123             (   divd_check.asm):00183                 cmpa #35
+610E 102700ED         (   divd_check.asm):00184                 beq all_done_eat_frame
+6112 B7621D           (   divd_check.asm):00185                 sta cur_test_track
+                      (   divd_check.asm):00186                 
+                      (   divd_check.asm):00187         ; check if inside directory track
+6115                  (   divd_check.asm):00188         check_inside_directory
+6115 B6621D           (   divd_check.asm):00189                 lda cur_test_track
+6118 8111             (   divd_check.asm):00190                 cmpa #17
+611A 27EF             (   divd_check.asm):00191                 beq increment_track
+                      (   divd_check.asm):00192         
+                      (   divd_check.asm):00193         ; check if inside allocated granule
+611C B6621D           (   divd_check.asm):00194                 lda cur_test_track
+611F 8111             (   divd_check.asm):00195                 cmpa #17
+6121 10250001         (   divd_check.asm):00196                 blo >
+6125 4A               (   divd_check.asm):00197                 deca                    ; decrement by one if track 17 or greater
+                      (   divd_check.asm):00198         !
+6126 48               (   divd_check.asm):00199                 asla            ; multiply adjusted track value by 2
+6127 F6621E           (   divd_check.asm):00200                 ldb cur_test_sector
+612A C10A             (   divd_check.asm):00201                 cmpb #10
+612C 10250001         (   divd_check.asm):00202                 blo >
+6130 4C               (   divd_check.asm):00203                 inca            ; increment a by one if on second half of track
+                      (   divd_check.asm):00204         !
+6131 8E6223           (   divd_check.asm):00205                 ldx #fat
+6134 A686             (   divd_check.asm):00206                 lda a,x                 ; check granule
+6136 81FF             (   divd_check.asm):00207                 cmpa #$ff       ; FF is free
+6138 10270002         (   divd_check.asm):00208                 beq load_next_test_sector
+613C 20B5             (   divd_check.asm):00209                 bra read_next_parameters
+                      (   divd_check.asm):00210                 
+                      (   divd_check.asm):00211         ; Load next test sector, reset counter and pointer
+613E                  (   divd_check.asm):00212         load_next_test_sector   
+613E BEC006           (   divd_check.asm):00213                 ldx $c006
+6141 8602             (   divd_check.asm):00214                 lda #2     ; read operation
+6143 A784             (   divd_check.asm):00215                 sta ,x
+6145 6F01             (   divd_check.asm):00216                 clr 1,x    ; Drive #0
+6147 B6621D           (   divd_check.asm):00217                 lda cur_test_track    ; track number
+614A A702             (   divd_check.asm):00218                 sta 2,x
+614C B6621E           (   divd_check.asm):00219                 lda cur_test_sector     ; sector number
+614F A703             (   divd_check.asm):00220                 sta 3,x
+6151 108E6323         (   divd_check.asm):00221                 ldy #ps   ; Buffer address
+6155 10AF04           (   divd_check.asm):00222                 sty 4,x
+6158 6F06             (   divd_check.asm):00223                 clr 6,x    ; clear error
+615A AD9FC004         (   divd_check.asm):00224                 jsr [$c004] ; read sector
+615E 6D06             (   divd_check.asm):00225                 tst 6,x
+6160 102600A4         (   divd_check.asm):00226                 bne errors_eat_frame
+                      (   divd_check.asm):00227         
+                      (   divd_check.asm):00228         ; Print info string
+6164 8652             (   divd_check.asm):00229                 lda #'R
+6166 AD9FA002         (   divd_check.asm):00230                 jsr [$a002]
+616A BD669F           (   divd_check.asm):00231             jsr print_space
+616D 8630             (   divd_check.asm):00232                 lda #'0
+616F AD9FA002         (   divd_check.asm):00233                 jsr [$a002]
+6173 BD669F           (   divd_check.asm):00234             jsr print_space
+6176 B6621D           (   divd_check.asm):00235                 lda cur_test_track
+6179 BD6683           (   divd_check.asm):00236                 jsr print_a
+617C BD669F           (   divd_check.asm):00237             jsr print_space
+617F B6621E           (   divd_check.asm):00238             lda cur_test_sector
+6182 BD6683           (   divd_check.asm):00239             jsr print_a
+6185 BD66AA           (   divd_check.asm):00240             jsr print_cr
+                      (   divd_check.asm):00241         
+6188 7F6221           (   divd_check.asm):00242                 clr test_number
+618B CE6323           (   divd_check.asm):00243                 ldu #ps
+                      (   divd_check.asm):00244                 
+618E 39               (   divd_check.asm):00245                 rts
+                      (   divd_check.asm):00246                 
+                      (   divd_check.asm):00247         ; Read results sector
+618F                  (   divd_check.asm):00248         read_new_results
+                      (   divd_check.asm):00249         ; Increment sector
+618F B66220           (   divd_check.asm):00250                 lda cur_res_sector
+6192 4C               (   divd_check.asm):00251                 inca
+6193 8112             (   divd_check.asm):00252                 cmpa #18
+6195 1023000F         (   divd_check.asm):00253                 bls >
+                      (   divd_check.asm):00254         ; incrememnt track
+6199 B6621F           (   divd_check.asm):00255                 lda cur_res_track
+619C 4C               (   divd_check.asm):00256                 inca
+619D 8123             (   divd_check.asm):00257                 cmpa #35
+619F 1027005C         (   divd_check.asm):00258                 beq all_done_eat_frame
+61A3 B7621F           (   divd_check.asm):00259                 sta cur_res_track
+61A6 8601             (   divd_check.asm):00260                 lda #1
+                      (   divd_check.asm):00261         !
+61A8 B76220           (   divd_check.asm):00262                 sta cur_res_sector
+61AB 10866523         (   divd_check.asm):00263                 ldw #rs+256
+61AF 7F6222           (   divd_check.asm):00264                 clr result_number
+                      (   divd_check.asm):00265         
+61B2 BEC006           (   divd_check.asm):00266                 ldx $c006
+61B5 8602             (   divd_check.asm):00267                 lda #2     ; read operation
+61B7 A784             (   divd_check.asm):00268                 sta ,x
+61B9 8601             (   divd_check.asm):00269                 lda #1
+61BB A701             (   divd_check.asm):00270                 sta 1,x    ; Drive #1
+61BD B6621F           (   divd_check.asm):00271                 lda cur_res_track    ; track number
+61C0 A702             (   divd_check.asm):00272                 sta 2,x
+61C2 B66220           (   divd_check.asm):00273                 lda cur_res_sector     ; sector number
+61C5 A703             (   divd_check.asm):00274                 sta 3,x
+61C7 108E6423         (   divd_check.asm):00275                 ldy #rs   ; Buffer address
+61CB 10AF04           (   divd_check.asm):00276                 sty 4,x
+61CE 6F06             (   divd_check.asm):00277                 clr 6,x    ; clear error
+61D0 AD9FC004         (   divd_check.asm):00278                 jsr [$c004] ; read sector
+61D4 6D06             (   divd_check.asm):00279                 tst 6,x
+61D6 1026002E         (   divd_check.asm):00280                 bne errors_eat_frame
+                      (   divd_check.asm):00281         
+                      (   divd_check.asm):00282         ; Print info string
+61DA 8652             (   divd_check.asm):00283                 lda #'R
+61DC AD9FA002         (   divd_check.asm):00284                 jsr [$a002]
+61E0 BD669F           (   divd_check.asm):00285             jsr print_space
+61E3 8631             (   divd_check.asm):00286                 lda #'1
+61E5 AD9FA002         (   divd_check.asm):00287                 jsr [$a002]
+61E9 BD669F           (   divd_check.asm):00288             jsr print_space
+61EC B6621F           (   divd_check.asm):00289                 lda cur_res_track
+61EF BD6683           (   divd_check.asm):00290                 jsr print_a
+61F2 BD669F           (   divd_check.asm):00291             jsr print_space
+61F5 B66220           (   divd_check.asm):00292             lda cur_res_sector
+61F8 BD6683           (   divd_check.asm):00293             jsr print_a
+61FB BD66AA           (   divd_check.asm):00294             jsr print_cr
+                      (   divd_check.asm):00295         
+61FE 39               (   divd_check.asm):00296                 rts
+                      (   divd_check.asm):00297                 
+61FF                  (   divd_check.asm):00298         all_done_eat_frame
+61FF 3262             (   divd_check.asm):00299                 leas 2,s
+6201                  (   divd_check.asm):00300         all_done
+6201 8E6538           (   divd_check.asm):00301                 ldx #done_string
+6204 BD6663           (   divd_check.asm):00302                 jsr print_string_x
+6207 39               (   divd_check.asm):00303                 rts
+                      (   divd_check.asm):00304         
+6208                  (   divd_check.asm):00305         errors_eat_frame
+6208 3262             (   divd_check.asm):00306                 leas 2,s
+620A                  (   divd_check.asm):00307         errors
+620A A606             (   divd_check.asm):00308                 lda 6,x
+620C 3402             (   divd_check.asm):00309                 pshs a
+620E 8E6557           (   divd_check.asm):00310                 ldx #error_string
+6211 BD6663           (   divd_check.asm):00311                 jsr print_string_x
+6214 3502             (   divd_check.asm):00312                 puls a
+6216 BD6683           (   divd_check.asm):00313             jsr print_a
+6219 BD66AA           (   divd_check.asm):00314             jsr print_cr        
+621C 39               (   divd_check.asm):00315                 rts
+                      (   divd_check.asm):00316         
+                      (   divd_check.asm):00317         ; Data
+621D                  (   divd_check.asm):00318         cur_test_track  rmb 1
+621E                  (   divd_check.asm):00319         cur_test_sector rmb 1
+621F                  (   divd_check.asm):00320         cur_res_track   rmb 1
+6220                  (   divd_check.asm):00321         cur_res_sector  rmb 1
+6221                  (   divd_check.asm):00322         test_number     rmb 1
+6222                  (   divd_check.asm):00323         result_number   rmb 1
+6223                  (   divd_check.asm):00324         fat rmb 256
+6323                  (   divd_check.asm):00325         ps      rmb 256
+6423                  (   divd_check.asm):00326         rs      rmb 256
+6523                  (   divd_check.asm):00327         compare rmb result_size
+                      (   divd_check.asm):00328         
+6526 54455354202320   (   divd_check.asm):00329         test_number_string fcc "TEST # "
+652D 00               (   divd_check.asm):00330                 fcb 0
+                      (   divd_check.asm):00331                 
+652E 524553554C542023 (   divd_check.asm):00332         res_number_string fcc "RESULT # "
+     20
+6537 00               (   divd_check.asm):00333                 fcb 0
+                      (   divd_check.asm):00334                 
+6538 434845434B20414C (   divd_check.asm):00335         done_string fcc "CHECK ALL DONE."
+     4C20444F4E452E
+6547 0D00             (   divd_check.asm):00336                 fcb 13,0
+6549 4F4E452053554343 (   divd_check.asm):00337         one_suc_string fcc "ONE SUCCEDE."
+     4544452E
+6555 0D00             (   divd_check.asm):00338                 fcb 13,0
+                      (   divd_check.asm):00339         
+6557 4449534B20455252 (   divd_check.asm):00340         error_string fcn "DISK ERROR: "
+     4F523A2000
+                      (   divd_check.asm):00341         
+6564                  (   divd_check.asm):00342         compare_fail
+                      (   divd_check.asm):00343         ; Not equal - report error
+6564 8E65E1           (   divd_check.asm):00344                 ldx #s1
+6567 BD6663           (   divd_check.asm):00345                 jsr print_string_x
+656A EC5D             (   divd_check.asm):00346                 ldd -3,u  ; dividend
+656C BD667E           (   divd_check.asm):00347                 jsr print_d
+656F 8E65F5           (   divd_check.asm):00348                 ldx #s2
+6572 BD6663           (   divd_check.asm):00349                 jsr print_string_x
+6575 A65F             (   divd_check.asm):00350                 lda -1,u   ; divisor
+6577 BD6683           (   divd_check.asm):00351                 jsr print_a
+657A BD66AA           (   divd_check.asm):00352                 jsr print_cr
+657D 8E65F9           (   divd_check.asm):00353                 ldx #s3
+6580 BD6663           (   divd_check.asm):00354                 jsr print_string_x
+6583 A6AFFFFD         (   divd_check.asm):00355                 lda -3,w    ; expected CC
+6587 BD6670           (   divd_check.asm):00356                 jsr print_a_hex
+658A BD66AA           (   divd_check.asm):00357                 jsr print_cr
+658D 8E6608           (   divd_check.asm):00358                 ldx #s4
+6590 BD6663           (   divd_check.asm):00359                 jsr print_string_x
+6593 8E6523           (   divd_check.asm):00360                 ldx #compare
+6596 A684             (   divd_check.asm):00361                 lda ,x    ; actual CC
+6598 BD6670           (   divd_check.asm):00362                 jsr print_a_hex
+659B BD66AA           (   divd_check.asm):00363                 jsr print_cr
+659E 8E6617           (   divd_check.asm):00364                 ldx #s5
+65A1 BD6663           (   divd_check.asm):00365                 jsr print_string_x
+65A4 A6AFFFFE         (   divd_check.asm):00366                 lda -2,w   ; expected result
+65A8 BD6683           (   divd_check.asm):00367                 jsr print_a
+65AB BD66AA           (   divd_check.asm):00368                 jsr print_cr
+65AE 8E662A           (   divd_check.asm):00369                 ldx #s6
+65B1 BD6663           (   divd_check.asm):00370                 jsr print_string_x
+65B4 8E6523           (   divd_check.asm):00371                 ldx #compare
+65B7 A601             (   divd_check.asm):00372                 lda 1,x   ; actual result
+65B9 BD6683           (   divd_check.asm):00373                 jsr print_a
+65BC BD66AA           (   divd_check.asm):00374                 jsr print_cr
+65BF 8E663D           (   divd_check.asm):00375                 ldx #s7
+65C2 BD6663           (   divd_check.asm):00376                 jsr print_string_x
+65C5 A6AFFFFF         (   divd_check.asm):00377                 lda -1,w   ; expected result
+65C9 BD6683           (   divd_check.asm):00378                 jsr print_a
+65CC BD66AA           (   divd_check.asm):00379                 jsr print_cr
+65CF 8E6650           (   divd_check.asm):00380                 ldx #s8
+65D2 BD6663           (   divd_check.asm):00381                 jsr print_string_x
+65D5 8E6523           (   divd_check.asm):00382                 ldx #compare
+65D8 A602             (   divd_check.asm):00383                 lda 2,x   ; actual result
+65DA BD6683           (   divd_check.asm):00384                 jsr print_a
+65DD BD66AA           (   divd_check.asm):00385                 jsr print_cr
+                      (   divd_check.asm):00386         
+65E0 39               (   divd_check.asm):00387                 rts
+                      (   divd_check.asm):00388         
+65E1 4449564420434F4D (   divd_check.asm):00389         s1 fcc "DIVD COMPARE FAIL."
+     5041524520464149
+     4C2E
+65F3 0D00             (   divd_check.asm):00390                 fcb 13,0
+65F5 202F20           (   divd_check.asm):00391         s2 fcc " / "
+65F8 00               (   divd_check.asm):00392                 fcb 0
+65F9 4343204558504543 (   divd_check.asm):00393         s3 fcc "CC EXPECTED: $"
+     5445443A2024
+6607 00               (   divd_check.asm):00394                 fcb 0
+6608 434320464F554E44 (   divd_check.asm):00395         s4 fcc "CC FOUND:    $"
+     3A2020202024
+6616 00               (   divd_check.asm):00396                 fcb 0
+6617 2841292044495620 (   divd_check.asm):00397         s5 fcc "(A) DIV EXPECTED: "
+     4558504543544544
+     3A20
+6629 00               (   divd_check.asm):00398                 fcb 0
+662A 2841292044495620 (   divd_check.asm):00399         s6 fcc "(A) DIV FOUND:    "
+     464F554E443A2020
+     2020
+663C 00               (   divd_check.asm):00400                 fcb 0
+663D 284229204D4F4420 (   divd_check.asm):00401         s7 fcc "(B) MOD EXPECTED: "
+     4558504543544544
+     3A20
+664F 00               (   divd_check.asm):00402                 fcb 0
+6650 284229204D4F4420 (   divd_check.asm):00403         s8 fcc "(B) MOD FOUND:    "
+     464F554E443A2020
+     2020
+6662 00               (   divd_check.asm):00404                 fcb 0
+                      (   divd_check.asm):00405         
+6663                  (   divd_check.asm):00406         print_string_x
+6663 A680             (   divd_check.asm):00407                 lda ,x+
+6665 10270006         (   divd_check.asm):00408                 beq >
+6669 AD9FA002         (   divd_check.asm):00409                 jsr [$a002]
+666D 20F4             (   divd_check.asm):00410                 bra print_string_x
+                      (   divd_check.asm):00411         !
+666F 39               (   divd_check.asm):00412                 rts
+                      (   divd_check.asm):00413         
+6670                  (   divd_check.asm):00414         print_a_hex
+6670 BD671F           (   divd_check.asm):00415                 jsr BN2HEX
+6673 AD9FA002         (   divd_check.asm):00416                 jsr [$a002]
+6677 1F98             (   divd_check.asm):00417                 tfr b,a
+6679 AD9FA002         (   divd_check.asm):00418                 jsr [$a002]
+667D 39               (   divd_check.asm):00419                 rts
+                      (   divd_check.asm):00420                 
+                      (   divd_check.asm):00421                 
+667E                  (   divd_check.asm):00422         print_d
+667E 3402             (   divd_check.asm):00423                 pshs a
+6680 160005           (   divd_check.asm):00424                 bra print_ab
+                      (   divd_check.asm):00425                         
+6683                  (   divd_check.asm):00426         print_a
+6683 3402             (   divd_check.asm):00427                 pshs a
+6685 1F89             (   divd_check.asm):00428                 tfr a,b
+6687 1D               (   divd_check.asm):00429                 sex
+6688                  (   divd_check.asm):00430         print_ab
+6688 8E6718           (   divd_check.asm):00431                 ldx #BUFFER
+668B BD66B1           (   divd_check.asm):00432                 jsr BN2DEC
+668E 8E6718           (   divd_check.asm):00433                 ldx #BUFFER
+6691 E680             (   divd_check.asm):00434                 ldb ,x+
+                      (   divd_check.asm):00435         !
+6693 A680             (   divd_check.asm):00436                 lda ,x+
+6695 AD9FA002         (   divd_check.asm):00437                 jsr [$a002]
+6699 5A               (   divd_check.asm):00438                 decb
+669A 26F7             (   divd_check.asm):00439                 bne <
+669C 3502             (   divd_check.asm):00440                 puls a
+669E 39               (   divd_check.asm):00441                 rts
+                      (   divd_check.asm):00442         
+669F                  (   divd_check.asm):00443         print_space
+669F 8620             (   divd_check.asm):00444                 lda #32
+66A1 AD9FA002         (   divd_check.asm):00445                 jsr [$a002]
+66A5 AD9FA002         (   divd_check.asm):00446                 jsr [$a002]
+66A9 39               (   divd_check.asm):00447                 rts
+                      (   divd_check.asm):00448         
+66AA                  (   divd_check.asm):00449         print_cr
+66AA 860D             (   divd_check.asm):00450                 lda #13
+66AC AD9FA002         (   divd_check.asm):00451                 jsr [$a002]
+66B0 39               (   divd_check.asm):00452                 rts
+                      (   divd_check.asm):00453         
+                      (   divd_check.asm):00454         ;
+                      (   divd_check.asm):00455         ;       Title:          Binary to-Decimal ASCII
+                      (   divd_check.asm):00456         ;
+                      (   divd_check.asm):00457         ;       Name:           BN2DEC
+                      (   divd_check.asm):00458         ;
+                      (   divd_check.asm):00459         ;       Purpose:        Converts a 16-bit signed binary number to ASCII data
+                      (   divd_check.asm):00460         ;
+                      (   divd_check.asm):00461         ;       Entry:          Register D = Value to convert 
+                      (   divd_check.asm):00462         ;                       Register X = Output buffer address
+                      (   divd_check.asm):00463         ;
+                      (   divd_check.asm):00464         ;       Exit:           The first byte of the buffer is the length,
+                      (   divd_check.asm):00465         ;                       followed by the characters
+                      (   divd_check.asm):00466         ;
+                      (   divd_check.asm):00467         ;       Registers Used: CC, D, X, Y
+                      (   divd_check.asm):00468         ;
+                      (   divd_check.asm):00469         ;       Time:           Approximately 1000 cycles
+                      (   divd_check.asm):00470         ;
+                      (   divd_check.asm):00471         ;       Size:           Program 99 bytes
+                      (   divd_check.asm):00472         ;                       Data up to 5 bytes on stack
+                      (   divd_check.asm):00473         ;
+                      (   divd_check.asm):00474         ;       SAVE ORIGINAL DATA IN BUFFER
+                      (   divd_check.asm):00475         ;       TAKE ABSOLUTE VALUE IF DATA NEGATIVE
+                      (   divd_check.asm):00476         ;
+66B1                  (   divd_check.asm):00477         BN2DEC:
+66B1 ED01             (   divd_check.asm):00478                 STD     1,X                     ; SAVE DATA IN BUFFER
+66B3 102A0005         (   divd_check.asm):00479                 BPL     CNVERT                  ; BRANCH IF DATA POSITIVE
+66B7 CC0000           (   divd_check.asm):00480                 LDD     #0                      ; ELSE TAKE ABSOLUTE VALUE
+66BA A301             (   divd_check.asm):00481                 SUBD    1,X
+                      (   divd_check.asm):00482         ;
+                      (   divd_check.asm):00483         ; INITIALIZE STRING LENGTH TO ZERO
+                      (   divd_check.asm):00484         ;
+66BC                  (   divd_check.asm):00485         CNVERT:
+66BC 6F84             (   divd_check.asm):00486                 CLR     ,X                      ; STRING LENGTH = 0
+                      (   divd_check.asm):00487         ;
+                      (   divd_check.asm):00488         ; DIVIDE BINARY DATA BY 10 BY
+                      (   divd_check.asm):00489         ; SUBTRACTING POWERS OF TEN 
+                      (   divd_check.asm):00490         ;
+66BE                  (   divd_check.asm):00491         DIV10:
+66BE 108EFC18         (   divd_check.asm):00492                 LDY     #-1000                  ; START QUOTIENT AT -1000
+                      (   divd_check.asm):00493         ;
+                      (   divd_check.asm):00494         ; FIND NUMBER 0F THOUSANDS IN QUOTIENT
+                      (   divd_check.asm):00495         ;
+66C2                  (   divd_check.asm):00496         THOUSD:
+66C2 31A903E8         (   divd_check.asm):00497                 LEAY    1000,Y                  ; ADD 1000 TO QUOTIENT
+66C6 832710           (   divd_check.asm):00498                 SUBD    #10000                  ; SUBTRACT 10000 FROM DIVIDEND
+66C9 24F7             (   divd_check.asm):00499                 BCC     THOUSD                  ; BRANCH IF DIFFERENCE STILL POSITIVE 
+66CB C32710           (   divd_check.asm):00500                 ADDD    #10000                  ; ELSE ADD BACK LAST 10000
+                      (   divd_check.asm):00501         ;
+                      (   divd_check.asm):00502         ; FIND NUMBER OF HUNDREDS IN QUOTIENT
+                      (   divd_check.asm):00503         ;
+66CE 31A89C           (   divd_check.asm):00504                 LEAY    -100,Y                  ; START NUMBER OF HUNDREDS AT -1
+66D1                  (   divd_check.asm):00505         HUNDD:
+66D1 31A864           (   divd_check.asm):00506                 LEAY    100,Y                   ; ADD 100 TO QUOTIENT
+66D4 8303E8           (   divd_check.asm):00507                 SUBD    #1000                   ; SUBTRACT 1000 FROM DIVIDEND
+66D7 24F8             (   divd_check.asm):00508                 BCC     HUNDD                   ; BRANCH IF DIFFERENCE STILL POSITIVE
+66D9 C303E8           (   divd_check.asm):00509                 ADDD    #1000                   ; ELSE ADD BACK LAST 1000
+                      (   divd_check.asm):00510         ;
+                      (   divd_check.asm):00511         ; FIND NUMBER OF TENS IN QUOTIENT
+                      (   divd_check.asm):00512         ;
+66DC 3136             (   divd_check.asm):00513                 LEAY    -10,Y                   ; STARTNUMBER OF TENS AT -1
+66DE                  (   divd_check.asm):00514         TENSD:
+66DE 312A             (   divd_check.asm):00515                 LEAY    10,Y                    ; ADD 10 TO QUOTIENT
+66E0 830064           (   divd_check.asm):00516                 SUBD    #100                    ; SUBTRACT 100 FROM DIVIDEND
+66E3 24F9             (   divd_check.asm):00517                 BCC     TENSD                   ; BRANCH IF DIFFERENCE STILL POSITIVE
+66E5 C30064           (   divd_check.asm):00518                 ADDD    #100                    ; ELSE ADD BACK LAST 100
+                      (   divd_check.asm):00519         ;
+                      (   divd_check.asm):00520         ; FIND NUMBER OF ONES IN QUOTIENT
+                      (   divd_check.asm):00521         ;
+66E8 313F             (   divd_check.asm):00522                 LEAY    -1,Y                    ; START NUMBER OF ONES AT -1
+66EA                  (   divd_check.asm):00523         ONESD:
+66EA 3121             (   divd_check.asm):00524                 LEAY    1,Y                     ; ADD 1 TO QUOTIENT
+66EC 83000A           (   divd_check.asm):00525                 SUBD    #10                     ; SUBTRACT 10 FROM DIVIDEND
+66EF 24F9             (   divd_check.asm):00526                 BCC     ONESD                   ; BRANCH IF DIFFERENCE STILL POSITIVE
+66F1 C3000A           (   divd_check.asm):00527                 ADDD    #10                     ; ELSE ADD BACK LAST 10
+66F4 E7E2             (   divd_check.asm):00528                 STB     ,-S                     ; SAVE REMAINDER IN STACK
+                      (   divd_check.asm):00529                                                 ; THIS IS NEXT DIGIT, MOVING LEFT
+                      (   divd_check.asm):00530                                                 ; LEAST SIGNIFICANT DIGIT GOES INTO STACK
+                      (   divd_check.asm):00531                                                 ; FIRST
+66F6 6C84             (   divd_check.asm):00532                 INC     ,X                      ; ADD 1 TO LENGTH BYTE
+                      (   divd_check.asm):00533         
+66F8 1F20             (   divd_check.asm):00534                 TFR     Y,D                     ; MAKE QUOTIENT INTO NEN DIVIDEND 
+66FA 10830000         (   divd_check.asm):00535                 CMPD    #0                      ; CHECK IF DIVIDEND ZERO
+66FE 26BE             (   divd_check.asm):00536                 BNE     DIV10                   ; BRANCH IF NOT DIVIDE BY 10 AGAIN
+                      (   divd_check.asm):00537         ;
+                      (   divd_check.asm):00538         ; CHECK IF ORIGINAL BINARY DATA WNAS NEGATIVE
+                      (   divd_check.asm):00539         ; IF SO, PUT ASCII AT FRONT OF BUFFER
+                      (   divd_check.asm):00540         ;
+6700 A680             (   divd_check.asm):00541                 LDA     ,X+                     ; GET LENGTH BYTE (NOT INCLUDING SIGN)
+6702 E684             (   divd_check.asm):00542                 LDB     ,X                      ; GET HIGH BYTE OF DATA
+6704 102A0006         (   divd_check.asm):00543                 BPL     BUFLOAD                 ; BRANCH IF DATA POSITIVE
+6708 C62D             (   divd_check.asm):00544                 LDB     #'-'                    ; OTHERWISE, GET ASCII MINUS SIGN
+670A E780             (   divd_check.asm):00545                 STB     ,X+                     ; STORE MINUS SIGN IN BUFFER
+670C 6C1E             (   divd_check.asm):00546                 INC     -2,X                    ; ADD 1 TO LENGTH BYTE FOR SIGN
+                      (   divd_check.asm):00547         ;
+                      (   divd_check.asm):00548         ; MOVE STRING OF DIGITS FROM STACK TO BUFFER 
+                      (   divd_check.asm):00549         ; HOST SIGNIFICANT DIGIT IS AT TOP OF STACK
+                      (   divd_check.asm):00550         ; CONVERT DIGITS TO ASCII BY ADDING ASCII 0
+                      (   divd_check.asm):00551         ;
+670E                  (   divd_check.asm):00552         BUFLOAD:
+670E E6E0             (   divd_check.asm):00553                 LDB     ,S+                     ; GET NEXT DIGIT FROM STACK, MOVING RIGHT
+6710 CB30             (   divd_check.asm):00554                 ADDB    #'0'                    ; CONVERT DIGIT TO ASCII
+6712 E780             (   divd_check.asm):00555                 STB     ,X+                     ; SAVE DIGIT IN BUFFER
+6714 4A               (   divd_check.asm):00556                 DECA                            ; DECREMENT BYTE COUNTER
+6715 26F7             (   divd_check.asm):00557                 BNE     BUFLOAD                 ; LOOP IF MORE BYTES LEFT
+6717 39               (   divd_check.asm):00558                 RTS
+6718                  (   divd_check.asm):00559         BUFFER:
+6718                  (   divd_check.asm):00560                 RMB     7                       ; BUFFER
+                      (   divd_check.asm):00561         
+                      (   divd_check.asm):00562         
+                      (   divd_check.asm):00563         
+                      (   divd_check.asm):00564         ;       Title:                  Binary to Hex ASCII
+                      (   divd_check.asm):00565         ;
+                      (   divd_check.asm):00566         ;       Name:                   BN2HEX
+                      (   divd_check.asm):00567         ;
+                      (   divd_check.asm):00568         ;       Purpose:                Converts one byte of binary data to two ASCII characters
+                      (   divd_check.asm):00569         ;
+                      (   divd_check.asm):00570         ;       Entry:                  Register A = Binary data
+                      (   divd_check.asm):00571         ;
+                      (   divd_check.asm):00572         ;       Exit:                   Register A = ASCII more significant digit
+                      (   divd_check.asm):00573         ;                               Register B = ASCII Less significant digit
+                      (   divd_check.asm):00574         ;
+                      (   divd_check.asm):00575         ;       Registers Used:         A,B,CC
+                      (   divd_check.asm):00576         ;
+                      (   divd_check.asm):00577         ;       Time:                   Approximately 37 cycles
+                      (   divd_check.asm):00578         ;
+                      (   divd_check.asm):00579         ;       Size:                   Program         27 bytes
+                      (   divd_check.asm):00580         ;                               Data            None
+                      (   divd_check.asm):00581         ;
+                      (   divd_check.asm):00582         
+671F                  (   divd_check.asm):00583         BN2HEX:
+                      (   divd_check.asm):00584                 ;
+                      (   divd_check.asm):00585                 ; CONVERT MORE SIGNIFICANT DIGIT TO ASCII
+                      (   divd_check.asm):00586                 ;
+671F 1F89             (   divd_check.asm):00587                 TFR     A,B             ; SAVE ORIGINAL BINARY VALUE MOVE HIGH DIGIT TO LOW DIGIT
+6721 44               (   divd_check.asm):00588                 LSRA
+6722 44               (   divd_check.asm):00589                 LSRA
+6723 44               (   divd_check.asm):00590                 LSRA
+6724 44               (   divd_check.asm):00591                 LSRA
+6725 8109             (   divd_check.asm):00592                 CMPA    #9
+6727 10230002         (   divd_check.asm):00593                 BLS     AD30            ; BRANCH IF HIGH DIGIT IS DECIMAL
+672B 8B07             (   divd_check.asm):00594                 ADDA    #7              ; ELSE ADD 7 S0 AFTER ADDING '0' THE 
+                      (   divd_check.asm):00595                                         ; CHARACTER WILL BE IN 'A'..'F'
+672D 8B30             (   divd_check.asm):00596         AD30:   ADDA    #'0'            ; ADD ASCII 0 TO MAKE A CHARACTER
+                      (   divd_check.asm):00597                 ;
+                      (   divd_check.asm):00598                 ; CONVERT LESS SIGNIFICANT DIGIT TO ASCII
+                      (   divd_check.asm):00599                 ; 
+672F C40F             (   divd_check.asm):00600                 ANDB    #$0F            ; MASK OFF LOW DIGIT    
+6731 C109             (   divd_check.asm):00601                 CMPB    #9              
+6733 10230002         (   divd_check.asm):00602                 BLS     AD30LD          ; BRANCH IF LOW DIGIT IS DECIMAL        
+6737 CB07             (   divd_check.asm):00603                 ADDB    #7              ; ELSE ADD 7 SO AFTER ADDING '0' THE
+                      (   divd_check.asm):00604                                         ; CHARACTER WILL BE IN 'A'..'F'
+6739 CB30             (   divd_check.asm):00605         AD30LD: ADDB    #'0'            ; ADD ASCII 0 TO MAKE A CHARACTER
+673B 39               (   divd_check.asm):00606                 RTS
+                      (   divd_check.asm):00607         
+                      (   divd_check.asm):00608                 
+                      (   divd_check.asm):00609                 end start

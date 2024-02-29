@@ -1,0 +1,444 @@
+                      (    divd_test.asm):00001         ; TEST - divd test program.
+                      (    divd_test.asm):00002         ; Unallocated sectors contain tables of randomized test data:
+                      (    divd_test.asm):00003         ; Byte 1: initial CC value
+                      (    divd_test.asm):00004         ; Byte 2: initial A value
+                      (    divd_test.asm):00005         ; Byte 3: initial B value
+                      (    divd_test.asm):00006         ; Byte 4: initial divisor
+                      (    divd_test.asm):00007         ; 
+                      (    divd_test.asm):00008         ; Results data:
+                      (    divd_test.asm):00009         ; Byte 1: resulting CC
+                      (    divd_test.asm):00010         ; Byte 2: resulting A
+                      (    divd_test.asm):00011         ; Byte 3: resulting B
+                      (    divd_test.asm):00012         
+                      (    divd_test.asm):00013             PRAGMA autobranchlength
+                      (    divd_test.asm):00014         
+     0004             (    divd_test.asm):00015         parameter_size equ 4
+     0003             (    divd_test.asm):00016         result_size equ 3
+     003F             (    divd_test.asm):00017         tests_per_sector equ 256/parameter_size-1
+     0054             (    divd_test.asm):00018         results_per_sector equ 256/result_size-1
+                      (    divd_test.asm):00019         
+                      (    divd_test.asm):00020                 org $6000
+6000                  (    divd_test.asm):00021         start
+                      (    divd_test.asm):00022         ; Load FAT
+6000 BEC006           (    divd_test.asm):00023                 ldx $c006
+6003 8602             (    divd_test.asm):00024                 lda #2     ; read operation
+6005 A784             (    divd_test.asm):00025                 sta ,x
+6007 6F01             (    divd_test.asm):00026                 clr 1,x    ; Drive #0
+6009 8611             (    divd_test.asm):00027                 lda #17    ; track number
+600B A702             (    divd_test.asm):00028                 sta 2,x
+600D 8602             (    divd_test.asm):00029                 lda #2     ; sector number
+600F A703             (    divd_test.asm):00030                 sta 3,x
+6011 108E620B         (    divd_test.asm):00031                 ldy #fat   ; Buffer address
+6015 10AF04           (    divd_test.asm):00032                 sty 4,x
+6018 6F06             (    divd_test.asm):00033                 clr 6,x    ; clear error
+601A AD9FC004         (    divd_test.asm):00034                 jsr [$c004] ; read sector
+601E 6D06             (    divd_test.asm):00035                 tst 6,x
+6020 102601CE         (    divd_test.asm):00036                 bne errors
+                      (    divd_test.asm):00037         
+                      (    divd_test.asm):00038         ; Restore both drives to track zero
+6024 BEC006           (    divd_test.asm):00039                 ldx $c006
+6027 6F84             (    divd_test.asm):00040                 clr ,x
+6029 6F01             (    divd_test.asm):00041                 clr 1,x
+602B AD9FC004         (    divd_test.asm):00042                 jsr [$c004]
+602F 6D06             (    divd_test.asm):00043                 tst 6,x
+6031 102601BD         (    divd_test.asm):00044                 bne errors
+6035 8601             (    divd_test.asm):00045                 lda #1
+6037 A701             (    divd_test.asm):00046                 sta 1,x
+6039 AD9FC004         (    divd_test.asm):00047                 jsr [$c004]
+603D 6D06             (    divd_test.asm):00048                 tst 6,x
+603F 102601AF         (    divd_test.asm):00049                 bne errors
+                      (    divd_test.asm):00050         
+                      (    divd_test.asm):00051         ; Initialize tables
+6043 8600             (    divd_test.asm):00052                 lda #0
+6045 B76205           (    divd_test.asm):00053                 sta cur_test_track
+6048 B76207           (    divd_test.asm):00054                 sta cur_res_track
+604B B76209           (    divd_test.asm):00055                 sta test_number
+604E B7620A           (    divd_test.asm):00056                 sta result_number
+6051 8601             (    divd_test.asm):00057                 lda #1
+6053 B76206           (    divd_test.asm):00058                 sta cur_test_sector
+6056 B76208           (    divd_test.asm):00059                 sta cur_res_sector
+                      (    divd_test.asm):00060                 
+                      (    divd_test.asm):00061         ; Load first sector of data
+                      (    divd_test.asm):00062         
+6059 BEC006           (    divd_test.asm):00063                 ldx $c006
+605C 8602             (    divd_test.asm):00064                 lda #2     ; read operation
+605E A784             (    divd_test.asm):00065                 sta ,x
+6060 6F01             (    divd_test.asm):00066                 clr 1,x    ; Drive #0
+6062 B66205           (    divd_test.asm):00067                 lda cur_test_track    ; track number
+6065 A702             (    divd_test.asm):00068                 sta 2,x
+6067 B66206           (    divd_test.asm):00069                 lda cur_test_sector     ; sector number
+606A A703             (    divd_test.asm):00070                 sta 3,x
+606C 108E630B         (    divd_test.asm):00071                 ldy #ps   ; Buffer address
+6070 10AF04           (    divd_test.asm):00072                 sty 4,x
+6073 6F06             (    divd_test.asm):00073                 clr 6,x    ; clear error
+6075 AD9FC004         (    divd_test.asm):00074                 jsr [$c004] ; read sector
+6079 6D06             (    divd_test.asm):00075                 tst 6,x
+607B 10260173         (    divd_test.asm):00076                 bne errors
+                      (    divd_test.asm):00077         
+                      (    divd_test.asm):00078         ; Load pointers and values;
+607F CE630B           (    divd_test.asm):00079                 ldu #ps
+6082 1086650B         (    divd_test.asm):00080                 ldw #rs+256
+6086                  (    divd_test.asm):00081         next_test
+6086 3707             (    divd_test.asm):00082                 pulu cc,a,b
+                      (    divd_test.asm):00083                 
+                      (    divd_test.asm):00084         ; Perform test
+6088 11ADC0           (    divd_test.asm):00085                 divd ,u+
+                      (    divd_test.asm):00086         
+                      (    divd_test.asm):00087         ; store results
+608B 1E36             (    divd_test.asm):00088                 exg u,w
+608D 3607             (    divd_test.asm):00089                 pshu cc,a,b
+608F 1E36             (    divd_test.asm):00090                 exg u,w
+                      (    divd_test.asm):00091         
+6091 1CAF             (    divd_test.asm):00092                 andcc #$af
+                      (    divd_test.asm):00093         
+                      (    divd_test.asm):00094         ; account for test      
+6093 7C6209           (    divd_test.asm):00095                 inc test_number
+6096 7C620A           (    divd_test.asm):00096                 inc result_number
+                      (    divd_test.asm):00097                 
+                      (    divd_test.asm):00098         ; check if results sector is full
+6099 B6620A           (    divd_test.asm):00099                 lda result_number
+609C 8154             (    divd_test.asm):00100                 cmpa #results_per_sector
+609E 102F0003         (    divd_test.asm):00101                 ble >
+60A2 1700AA           (    divd_test.asm):00102                 bsr write_these_results
+                      (    divd_test.asm):00103                 
+                      (    divd_test.asm):00104         ; check if parameters on this sector are all consumed
+                      (    divd_test.asm):00105         !
+60A5 B66209           (    divd_test.asm):00106                 lda test_number
+60A8 813F             (    divd_test.asm):00107                 cmpa #tests_per_sector
+60AA 102F0003         (    divd_test.asm):00108                 ble >
+60AE 170002           (    divd_test.asm):00109                 bsr read_next_parameters
+                      (    divd_test.asm):00110                 
+                      (    divd_test.asm):00111         ; repeat
+                      (    divd_test.asm):00112         !
+60B1 20D3             (    divd_test.asm):00113                 bra next_test
+                      (    divd_test.asm):00114                 
+                      (    divd_test.asm):00115         ; Load next testing sector
+60B3                  (    divd_test.asm):00116         read_next_parameters
+                      (    divd_test.asm):00117         
+                      (    divd_test.asm):00118         ; Increment to next sector
+60B3 B66206           (    divd_test.asm):00119                 lda cur_test_sector
+60B6 8112             (    divd_test.asm):00120                 cmpa #18
+60B8 10270007         (    divd_test.asm):00121                 beq >     ; go increment track
+60BC 4C               (    divd_test.asm):00122                 inca
+60BD B76206           (    divd_test.asm):00123                 sta cur_test_sector
+60C0 160012           (    divd_test.asm):00124                 bra check_inside_directory
+                      (    divd_test.asm):00125         !
+60C3 8601             (    divd_test.asm):00126                 lda #1
+60C5 B76206           (    divd_test.asm):00127                 sta cur_test_sector
+                      (    divd_test.asm):00128         ; increment to next track
+60C8 B66205           (    divd_test.asm):00129                 lda cur_test_track
+60CB                  (    divd_test.asm):00130         increment_track
+60CB 4C               (    divd_test.asm):00131                 inca
+60CC 8123             (    divd_test.asm):00132                 cmpa #35
+60CE 102700ED         (    divd_test.asm):00133                 beq all_done_eat_frame
+60D2 B76205           (    divd_test.asm):00134                 sta cur_test_track
+                      (    divd_test.asm):00135                 
+                      (    divd_test.asm):00136         ; check if inside directory track
+60D5                  (    divd_test.asm):00137         check_inside_directory
+60D5 B66205           (    divd_test.asm):00138                 lda cur_test_track
+60D8 8111             (    divd_test.asm):00139                 cmpa #17
+60DA 27EF             (    divd_test.asm):00140                 beq increment_track
+                      (    divd_test.asm):00141         
+                      (    divd_test.asm):00142         ; check if inside allocated granule
+60DC B66205           (    divd_test.asm):00143                 lda cur_test_track
+60DF 8111             (    divd_test.asm):00144                 cmpa #17
+60E1 10250001         (    divd_test.asm):00145                 blo >
+60E5 4A               (    divd_test.asm):00146                 deca                    ; decrement by one if track 17 or greater
+                      (    divd_test.asm):00147         !
+60E6 48               (    divd_test.asm):00148                 asla            ; multiply adjusted track value by 2
+60E7 F66206           (    divd_test.asm):00149                 ldb cur_test_sector
+60EA C10A             (    divd_test.asm):00150                 cmpb #10
+60EC 10250001         (    divd_test.asm):00151                 blo >
+60F0 4C               (    divd_test.asm):00152                 inca            ; increment a by one if on second half of track
+                      (    divd_test.asm):00153         !
+60F1 8E620B           (    divd_test.asm):00154                 ldx #fat
+60F4 A686             (    divd_test.asm):00155                 lda a,x                 ; check granule
+60F6 81FF             (    divd_test.asm):00156                 cmpa #$ff       ; FF is free
+60F8 10270002         (    divd_test.asm):00157                 beq load_next_test_sector
+60FC 20B5             (    divd_test.asm):00158                 bra read_next_parameters
+                      (    divd_test.asm):00159                 
+                      (    divd_test.asm):00160         ; Load next test sector, reset counter and pointer
+60FE                  (    divd_test.asm):00161         load_next_test_sector   
+60FE BEC006           (    divd_test.asm):00162                 ldx $c006
+6101 8602             (    divd_test.asm):00163                 lda #2     ; read operation
+6103 A784             (    divd_test.asm):00164                 sta ,x
+6105 6F01             (    divd_test.asm):00165                 clr 1,x    ; Drive #0
+6107 B66205           (    divd_test.asm):00166                 lda cur_test_track    ; track number
+610A A702             (    divd_test.asm):00167                 sta 2,x
+610C B66206           (    divd_test.asm):00168                 lda cur_test_sector     ; sector number
+610F A703             (    divd_test.asm):00169                 sta 3,x
+6111 108E630B         (    divd_test.asm):00170                 ldy #ps   ; Buffer address
+6115 10AF04           (    divd_test.asm):00171                 sty 4,x
+6118 6F06             (    divd_test.asm):00172                 clr 6,x    ; clear error
+611A AD9FC004         (    divd_test.asm):00173                 jsr [$c004] ; read sector
+611E 6D06             (    divd_test.asm):00174                 tst 6,x
+6120 102600CC         (    divd_test.asm):00175                 bne errors_eat_frame
+                      (    divd_test.asm):00176         
+                      (    divd_test.asm):00177         ; Print info string
+6124 8652             (    divd_test.asm):00178                 lda #'R
+6126 AD9FA002         (    divd_test.asm):00179                 jsr [$a002]
+612A BD6551           (    divd_test.asm):00180             jsr print_space
+612D 8630             (    divd_test.asm):00181                 lda #'0
+612F AD9FA002         (    divd_test.asm):00182                 jsr [$a002]
+6133 BD6551           (    divd_test.asm):00183             jsr print_space
+6136 B66205           (    divd_test.asm):00184                 lda cur_test_track
+6139 BD6535           (    divd_test.asm):00185                 jsr print_a
+613C BD6551           (    divd_test.asm):00186             jsr print_space
+613F B66206           (    divd_test.asm):00187             lda cur_test_sector
+6142 BD6535           (    divd_test.asm):00188             jsr print_a
+6145 BD655C           (    divd_test.asm):00189             jsr print_cr
+                      (    divd_test.asm):00190         
+6148 7F6209           (    divd_test.asm):00191                 clr test_number
+614B CE630B           (    divd_test.asm):00192                 ldu #ps
+                      (    divd_test.asm):00193                 
+614E 39               (    divd_test.asm):00194                 rts
+                      (    divd_test.asm):00195                 
+                      (    divd_test.asm):00196         ; Save results sector
+614F                  (    divd_test.asm):00197         write_these_results
+614F BEC006           (    divd_test.asm):00198                 ldx $c006
+6152 8603             (    divd_test.asm):00199                 lda #3     ; write operation
+6154 A784             (    divd_test.asm):00200                 sta ,x
+6156 8601             (    divd_test.asm):00201                 lda #1
+6158 A701             (    divd_test.asm):00202                 sta 1,x    ; Drive #1
+615A B66207           (    divd_test.asm):00203                 lda cur_res_track    ; track number
+615D A702             (    divd_test.asm):00204                 sta 2,x
+615F B66208           (    divd_test.asm):00205                 lda cur_res_sector     ; sector number
+6162 A703             (    divd_test.asm):00206                 sta 3,x
+6164 108E640B         (    divd_test.asm):00207                 ldy #rs   ; Buffer address
+6168 10AF04           (    divd_test.asm):00208                 sty 4,x
+616B 6F06             (    divd_test.asm):00209                 clr 6,x    ; clear error
+616D AD9FC004         (    divd_test.asm):00210                 jsr [$c004] ; read sector
+6171 6D06             (    divd_test.asm):00211                 tst 6,x
+6173 10260079         (    divd_test.asm):00212                 bne errors_eat_frame
+                      (    divd_test.asm):00213         
+                      (    divd_test.asm):00214         ; Print info string
+6177 8657             (    divd_test.asm):00215                 lda #'W
+6179 AD9FA002         (    divd_test.asm):00216                 jsr [$a002]
+617D BD6551           (    divd_test.asm):00217             jsr print_space
+6180 8631             (    divd_test.asm):00218                 lda #'1
+6182 AD9FA002         (    divd_test.asm):00219                 jsr [$a002]
+6186 BD6551           (    divd_test.asm):00220             jsr print_space
+6189 B66207           (    divd_test.asm):00221                 lda cur_res_track
+618C BD6535           (    divd_test.asm):00222                 jsr print_a
+618F BD6551           (    divd_test.asm):00223             jsr print_space
+6192 B66208           (    divd_test.asm):00224             lda cur_res_sector
+6195 BD6535           (    divd_test.asm):00225             jsr print_a
+6198 BD655C           (    divd_test.asm):00226             jsr print_cr
+                      (    divd_test.asm):00227         
+                      (    divd_test.asm):00228         ; Increment sector
+619B B66208           (    divd_test.asm):00229                 lda cur_res_sector
+619E 4C               (    divd_test.asm):00230                 inca
+619F 8112             (    divd_test.asm):00231                 cmpa #18
+61A1 1023000F         (    divd_test.asm):00232                 bls >
+                      (    divd_test.asm):00233         ; incrememnt track
+61A5 B66207           (    divd_test.asm):00234                 lda cur_res_track
+61A8 4C               (    divd_test.asm):00235                 inca
+61A9 8123             (    divd_test.asm):00236                 cmpa #35
+61AB 10270010         (    divd_test.asm):00237                 beq all_done_eat_frame
+61AF B76207           (    divd_test.asm):00238                 sta cur_res_track
+61B2 8601             (    divd_test.asm):00239                 lda #1
+                      (    divd_test.asm):00240         !
+61B4 B76208           (    divd_test.asm):00241                 sta cur_res_sector
+61B7 1086650B         (    divd_test.asm):00242                 ldw #rs+256
+61BB 7F620A           (    divd_test.asm):00243                 clr result_number
+61BE 39               (    divd_test.asm):00244                 rts
+                      (    divd_test.asm):00245                 
+61BF                  (    divd_test.asm):00246         all_done_eat_frame
+61BF 3262             (    divd_test.asm):00247                 leas 2,s
+61C1                  (    divd_test.asm):00248         all_done
+                      (    divd_test.asm):00249         ; Save progress on results sector
+                      (    divd_test.asm):00250         
+61C1 BEC006           (    divd_test.asm):00251                 ldx $c006
+61C4 8603             (    divd_test.asm):00252                 lda #3     ; write operation
+61C6 A784             (    divd_test.asm):00253                 sta ,x
+61C8 8601             (    divd_test.asm):00254                 lda #1
+61CA A701             (    divd_test.asm):00255                 sta 1,x    ; Drive #1
+61CC B66207           (    divd_test.asm):00256                 lda cur_res_track    ; track number
+61CF A702             (    divd_test.asm):00257                 sta 2,x
+61D1 B66208           (    divd_test.asm):00258                 lda cur_res_sector     ; sector number
+61D4 A703             (    divd_test.asm):00259                 sta 3,x
+61D6 108E640B         (    divd_test.asm):00260                 ldy #rs   ; Buffer address
+61DA 10AF04           (    divd_test.asm):00261                 sty 4,x
+61DD 6F06             (    divd_test.asm):00262                 clr 6,x    ; clear error
+61DF AD9FC004         (    divd_test.asm):00263                 jsr [$c004] ; read sector
+61E3 6D06             (    divd_test.asm):00264                 tst 6,x
+61E5 10260007         (    divd_test.asm):00265                 bne errors_eat_frame
+                      (    divd_test.asm):00266         
+61E9 8E650B           (    divd_test.asm):00267                 ldx #done_string
+61EC BD6528           (    divd_test.asm):00268                 jsr print_string_x
+61EF 39               (    divd_test.asm):00269                 rts
+                      (    divd_test.asm):00270         
+61F0                  (    divd_test.asm):00271         errors_eat_frame
+61F0 3262             (    divd_test.asm):00272                 leas 2,s
+61F2                  (    divd_test.asm):00273         errors
+61F2 A606             (    divd_test.asm):00274                 lda 6,x
+61F4 3402             (    divd_test.asm):00275                 pshs a
+61F6 8E651B           (    divd_test.asm):00276                 ldx #error_string
+61F9 BD6528           (    divd_test.asm):00277                 jsr print_string_x
+61FC 3502             (    divd_test.asm):00278                 puls a
+61FE BD6535           (    divd_test.asm):00279             jsr print_a
+6201 BD655C           (    divd_test.asm):00280             jsr print_cr        
+6204 39               (    divd_test.asm):00281                 rts
+                      (    divd_test.asm):00282         
+                      (    divd_test.asm):00283         ; Data
+6205                  (    divd_test.asm):00284         cur_test_track  rmb 1
+6206                  (    divd_test.asm):00285         cur_test_sector rmb 1
+6207                  (    divd_test.asm):00286         cur_res_track   rmb 1
+6208                  (    divd_test.asm):00287         cur_res_sector  rmb 1
+6209                  (    divd_test.asm):00288         test_number     rmb 1
+620A                  (    divd_test.asm):00289         result_number   rmb 1
+620B                  (    divd_test.asm):00290         fat RMB 256
+630B                  (    divd_test.asm):00291         ps      RMB 256
+640B                  (    divd_test.asm):00292         rs      RMB 256
+                      (    divd_test.asm):00293         
+650B 5445535420414C4C (    divd_test.asm):00294         done_string fcc "TEST ALL DONE."
+     20444F4E452E
+6519 0D00             (    divd_test.asm):00295                 fcb 13,0
+                      (    divd_test.asm):00296                 
+651B 4449534B20455252 (    divd_test.asm):00297         error_string fcn "DISK ERROR: "
+     4F523A2000
+                      (    divd_test.asm):00298         
+6528                  (    divd_test.asm):00299         print_string_x
+6528 A680             (    divd_test.asm):00300                 lda ,x+
+652A 10270006         (    divd_test.asm):00301                 beq >
+652E AD9FA002         (    divd_test.asm):00302                 jsr [$a002]
+6532 20F4             (    divd_test.asm):00303                 bra print_string_x
+                      (    divd_test.asm):00304         !
+6534 39               (    divd_test.asm):00305                 rts
+                      (    divd_test.asm):00306                         
+6535                  (    divd_test.asm):00307         print_a
+6535 3402             (    divd_test.asm):00308                 pshs a
+6537 1F89             (    divd_test.asm):00309                 tfr a,b
+6539 4F               (    divd_test.asm):00310                 clra
+653A 8E65CA           (    divd_test.asm):00311                 ldx #BUFFER
+653D BD6563           (    divd_test.asm):00312                 jsr BN2DEC
+6540 8E65CA           (    divd_test.asm):00313                 ldx #BUFFER
+6543 E680             (    divd_test.asm):00314                 ldb ,x+
+                      (    divd_test.asm):00315         !
+6545 A680             (    divd_test.asm):00316                 lda ,x+
+6547 AD9FA002         (    divd_test.asm):00317                 jsr [$a002]
+654B 5A               (    divd_test.asm):00318                 decb
+654C 26F7             (    divd_test.asm):00319                 bne <
+654E 3502             (    divd_test.asm):00320                 puls a
+6550 39               (    divd_test.asm):00321                 rts
+                      (    divd_test.asm):00322         
+6551                  (    divd_test.asm):00323         print_space
+6551 8620             (    divd_test.asm):00324                 lda #32
+6553 AD9FA002         (    divd_test.asm):00325                 jsr [$a002]
+6557 AD9FA002         (    divd_test.asm):00326                 jsr [$a002]
+655B 39               (    divd_test.asm):00327                 rts
+                      (    divd_test.asm):00328         
+655C                  (    divd_test.asm):00329         print_cr
+655C 860D             (    divd_test.asm):00330                 lda #13
+655E AD9FA002         (    divd_test.asm):00331                 jsr [$a002]
+6562 39               (    divd_test.asm):00332                 rts
+                      (    divd_test.asm):00333         
+                      (    divd_test.asm):00334         ;
+                      (    divd_test.asm):00335         ;       Title:          Binary to-Decimal ASCII
+                      (    divd_test.asm):00336         ;
+                      (    divd_test.asm):00337         ;       Name:           BN2DEC
+                      (    divd_test.asm):00338         ;
+                      (    divd_test.asm):00339         ;       Purpose:        Converts a 16-bit signed binary number to ASCII data
+                      (    divd_test.asm):00340         ;
+                      (    divd_test.asm):00341         ;       Entry:          Register D = Value to convert 
+                      (    divd_test.asm):00342         ;                       Register X = Output buffer address
+                      (    divd_test.asm):00343         ;
+                      (    divd_test.asm):00344         ;       Exit:           The first byte of the buffer is the length,
+                      (    divd_test.asm):00345         ;                       followed by the characters
+                      (    divd_test.asm):00346         ;
+                      (    divd_test.asm):00347         ;       Registers Used: CC, D, X, Y
+                      (    divd_test.asm):00348         ;
+                      (    divd_test.asm):00349         ;       Time:           Approximately 1000 cycles
+                      (    divd_test.asm):00350         ;
+                      (    divd_test.asm):00351         ;       Size:           Program 99 bytes
+                      (    divd_test.asm):00352         ;                       Data up to 5 bytes on stack
+                      (    divd_test.asm):00353         ;
+                      (    divd_test.asm):00354         ;       SAVE ORIGINAL DATA IN BUFFER
+                      (    divd_test.asm):00355         ;       TAKE ABSOLUTE VALUE IF DATA NEGATIVE
+                      (    divd_test.asm):00356         ;
+6563                  (    divd_test.asm):00357         BN2DEC:
+6563 ED01             (    divd_test.asm):00358                 STD     1,X                     ; SAVE DATA IN BUFFER
+6565 102A0005         (    divd_test.asm):00359                 BPL     CNVERT                  ; BRANCH IF DATA POSITIVE
+6569 CC0000           (    divd_test.asm):00360                 LDD     #0                      ; ELSE TAKE ABSOLUTE VALUE
+656C A301             (    divd_test.asm):00361                 SUBD    1,X
+                      (    divd_test.asm):00362         ;
+                      (    divd_test.asm):00363         ; INITIALIZE STRING LENGTH TO ZERO
+                      (    divd_test.asm):00364         ;
+656E                  (    divd_test.asm):00365         CNVERT:
+656E 6F84             (    divd_test.asm):00366                 CLR     ,X                      ; STRING LENGTH = 0
+                      (    divd_test.asm):00367         ;
+                      (    divd_test.asm):00368         ; DIVIDE BINARY DATA BY 10 BY
+                      (    divd_test.asm):00369         ; SUBTRACTING POWERS OF TEN 
+                      (    divd_test.asm):00370         ;
+6570                  (    divd_test.asm):00371         DIV10:
+6570 108EFC18         (    divd_test.asm):00372                 LDY     #-1000                  ; START QUOTIENT AT -1000
+                      (    divd_test.asm):00373         ;
+                      (    divd_test.asm):00374         ; FIND NUMBER 0F THOUSANDS IN QUOTIENT
+                      (    divd_test.asm):00375         ;
+6574                  (    divd_test.asm):00376         THOUSD:
+6574 31A903E8         (    divd_test.asm):00377                 LEAY    1000,Y                  ; ADD 1000 TO QUOTIENT
+6578 832710           (    divd_test.asm):00378                 SUBD    #10000                  ; SUBTRACT 10000 FROM DIVIDEND
+657B 24F7             (    divd_test.asm):00379                 BCC     THOUSD                  ; BRANCH IF DIFFERENCE STILL POSITIVE 
+657D C32710           (    divd_test.asm):00380                 ADDD    #10000                  ; ELSE ADD BACK LAST 10000
+                      (    divd_test.asm):00381         ;
+                      (    divd_test.asm):00382         ; FIND NUMBER OF HUNDREDS IN QUOTIENT
+                      (    divd_test.asm):00383         ;
+6580 31A89C           (    divd_test.asm):00384                 LEAY    -100,Y                  ; START NUMBER OF HUNDREDS AT -1
+6583                  (    divd_test.asm):00385         HUNDD:
+6583 31A864           (    divd_test.asm):00386                 LEAY    100,Y                   ; ADD 100 TO QUOTIENT
+6586 8303E8           (    divd_test.asm):00387                 SUBD    #1000                   ; SUBTRACT 1000 FROM DIVIDEND
+6589 24F8             (    divd_test.asm):00388                 BCC     HUNDD                   ; BRANCH IF DIFFERENCE STILL POSITIVE
+658B C303E8           (    divd_test.asm):00389                 ADDD    #1000                   ; ELSE ADD BACK LAST 1000
+                      (    divd_test.asm):00390         ;
+                      (    divd_test.asm):00391         ; FIND NUMBER OF TENS IN QUOTIENT
+                      (    divd_test.asm):00392         ;
+658E 3136             (    divd_test.asm):00393                 LEAY    -10,Y                   ; STARTNUMBER OF TENS AT -1
+6590                  (    divd_test.asm):00394         TENSD:
+6590 312A             (    divd_test.asm):00395                 LEAY    10,Y                    ; ADD 10 TO QUOTIENT
+6592 830064           (    divd_test.asm):00396                 SUBD    #100                    ; SUBTRACT 100 FROM DIVIDEND
+6595 24F9             (    divd_test.asm):00397                 BCC     TENSD                   ; BRANCH IF DIFFERENCE STILL POSITIVE
+6597 C30064           (    divd_test.asm):00398                 ADDD    #100                    ; ELSE ADD BACK LAST 100
+                      (    divd_test.asm):00399         ;
+                      (    divd_test.asm):00400         ; FIND NUMBER OF ONES IN QUOTIENT
+                      (    divd_test.asm):00401         ;
+659A 313F             (    divd_test.asm):00402                 LEAY    -1,Y                    ; START NUMBER OF ONES AT -1
+659C                  (    divd_test.asm):00403         ONESD:
+659C 3121             (    divd_test.asm):00404                 LEAY    1,Y                     ; ADD 1 TO QUOTIENT
+659E 83000A           (    divd_test.asm):00405                 SUBD    #10                     ; SUBTRACT 10 FROM DIVIDEND
+65A1 24F9             (    divd_test.asm):00406                 BCC     ONESD                   ; BRANCH IF DIFFERENCE STILL POSITIVE
+65A3 C3000A           (    divd_test.asm):00407                 ADDD    #10                     ; ELSE ADD BACK LAST 10
+65A6 E7E2             (    divd_test.asm):00408                 STB     ,-S                     ; SAVE REMAINDER IN STACK
+                      (    divd_test.asm):00409                                                 ; THIS IS NEXT DIGIT, MOVING LEFT
+                      (    divd_test.asm):00410                                                 ; LEAST SIGNIFICANT DIGIT GOES INTO STACK
+                      (    divd_test.asm):00411                                                 ; FIRST
+65A8 6C84             (    divd_test.asm):00412                 INC     ,X                      ; ADD 1 TO LENGTH BYTE
+                      (    divd_test.asm):00413         
+65AA 1F20             (    divd_test.asm):00414                 TFR     Y,D                     ; MAKE QUOTIENT INTO NEN DIVIDEND 
+65AC 10830000         (    divd_test.asm):00415                 CMPD    #0                      ; CHECK IF DIVIDEND ZERO
+65B0 26BE             (    divd_test.asm):00416                 BNE     DIV10                   ; BRANCH IF NOT DIVIDE BY 10 AGAIN
+                      (    divd_test.asm):00417         ;
+                      (    divd_test.asm):00418         ; CHECK IF ORIGINAL BINARY DATA WNAS NEGATIVE
+                      (    divd_test.asm):00419         ; IF SO, PUT ASCII AT FRONT OF BUFFER
+                      (    divd_test.asm):00420         ;
+65B2 A680             (    divd_test.asm):00421                 LDA     ,X+                     ; GET LENGTH BYTE (NOT INCLUDING SIGN)
+65B4 E684             (    divd_test.asm):00422                 LDB     ,X                      ; GET HIGH BYTE OF DATA
+65B6 102A0006         (    divd_test.asm):00423                 BPL     BUFLOAD                 ; BRANCH IF DATA POSITIVE
+65BA C62D             (    divd_test.asm):00424                 LDB     #'-'                    ; OTHERWISE, GET ASCII MINUS SIGN
+65BC E780             (    divd_test.asm):00425                 STB     ,X+                     ; STORE MINUS SIGN IN BUFFER
+65BE 6C1E             (    divd_test.asm):00426                 INC     -2,X                    ; ADD 1 TO LENGTH BYTE FOR SIGN
+                      (    divd_test.asm):00427         ;
+                      (    divd_test.asm):00428         ; MOVE STRING OF DIGITS FROM STACK TO BUFFER 
+                      (    divd_test.asm):00429         ; HOST SIGNIFICANT DIGIT IS AT TOP OF STACK
+                      (    divd_test.asm):00430         ; CONVERT DIGITS TO ASCII BY ADDING ASCII 0
+                      (    divd_test.asm):00431         ;
+65C0                  (    divd_test.asm):00432         BUFLOAD:
+65C0 E6E0             (    divd_test.asm):00433                 LDB     ,S+                     ; GET NEXT DIGIT FROM STACK, MOVING RIGHT
+65C2 CB30             (    divd_test.asm):00434                 ADDB    #'0'                    ; CONVERT DIGIT TO ASCII
+65C4 E780             (    divd_test.asm):00435                 STB     ,X+                     ; SAVE DIGIT IN BUFFER
+65C6 4A               (    divd_test.asm):00436                 DECA                            ; DECREMENT BYTE COUNTER
+65C7 26F7             (    divd_test.asm):00437                 BNE     BUFLOAD                 ; LOOP IF MORE BYTES LEFT
+65C9 39               (    divd_test.asm):00438                 RTS
+65CA                  (    divd_test.asm):00439         BUFFER:
+65CA                  (    divd_test.asm):00440                 RMB     7                       ; BUFFER
+                      (    divd_test.asm):00441                 
+                      (    divd_test.asm):00442                 end start
