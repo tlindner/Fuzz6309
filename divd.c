@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <libkern/OSByteOrder.h>
+#include <stdbool.h>
 
 /* 6309 DIVD fuzzing disk
    This command will create two disk images.
@@ -24,37 +26,82 @@
    The DIVD parameters are constrained:
    1. The Condition Code register will only randomize the flags
    2. There will be no zero divisors.
+   3. The three code paths will have equal number of tests
    
 */
 
-union Data {
-   long rnd;
-   unsigned char buf[sizeof(long)];
-} data; 
+unsigned int ok_count;
+unsigned int sign_overflow_count;
+unsigned int range_overflow_count;
 
 void writeSector( FILE *file )
 {
-	union Data v;
-
 	for(int i=0; i<64; i++ )
 	{
-		v.rnd = random();
+		unsigned char initial_cc;
+		signed short numerator;
+		signed char divisor;
+		
+		initial_cc = random();
 
-		// check for zero divisor
-		while( v.buf[3] == 0 )
+		initial_cc &= 0x2f; /* keep flags */
+		initial_cc |= 0xd0; /* disable interrupts */
+		
+		bool good = false;
+		signed short r;
+
+		do
 		{
-			// re-roll
-			v.rnd = random();
-		}
+			numerator = random();
+			divisor = random();
 
-		v.buf[0] &= 0x2f; /* keep flags */
-		v.buf[0] |= 0xd0; /* disable interrupts */
+			// check for zero divisor
+			while( divisor == 0 )
+			{
+				// re-roll
+				divisor = random();
+			}
+
+			r = numerator / divisor;
+		
+			if( r >= -128 && r <= 127 )
+			{
+				if( (ok_count <= sign_overflow_count) && (ok_count <= range_overflow_count))
+				{
+					good = true;
+					ok_count++;
+				}
+			}
+			else if( r >= -255 && r <= 255)
+			{
+				if( (sign_overflow_count <= ok_count) && (sign_overflow_count <= range_overflow_count))
+				{
+					good = true;
+					sign_overflow_count++;
+				}
+			}
+			else 
+			{
+				if( (range_overflow_count <= ok_count) && (range_overflow_count <= sign_overflow_count))
+				{
+					good = true;
+					range_overflow_count++;
+				}
+			}
+		} while (good == false);
+		
+		//printf( "%d / %d = %d\n", numerator, divisor, r );
+		//printf( "%10d, %10d, %10d\n", ok_count, sign_overflow_count, range_overflow_count);
 		
 		/* Data packet for DIVD:
 		 CC, A, B, divisor
 		*/
 		
-		fwrite( v.buf, 1, 4, file );
+		numerator = OSSwapInt16(numerator);
+		
+		fwrite( &initial_cc, 1, 1, file );
+		fwrite( &numerator, 1, 2, file );
+		fwrite( &divisor, 1, 1, file );
 	}
 }
 
@@ -112,6 +159,10 @@ void writeTrackDirectory( FILE *file )
 	
 int main( int argc, char *argv[] )
 {
+	ok_count = 0;
+	sign_overflow_count = 0;
+	range_overflow_count = 0;
+	
 	FILE *out;
 	srandomdev();
 	
@@ -166,4 +217,10 @@ int main( int argc, char *argv[] )
 	}
 
 	fclose( out );
+
+	printf( "   DIVD, legal range count: %d\n", ok_count );
+	printf( " DIVD, sign overflow count: %d\n", sign_overflow_count );
+	printf( "DIVD, range overflow count: %d\n", range_overflow_count );
+	printf( "               total count: %d\n", range_overflow_count+sign_overflow_count+ok_count );
+	
 }
