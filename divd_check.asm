@@ -343,13 +343,35 @@ compare_fail
 ; Not equal - report error
 	ldx #s1
 	jsr print_string_x
+
+	ldx #s0
+	jsr print_string_x
+	lda -4,u    ; Initial CC
+	jsr print_a_hex
+	jsr print_cr
+	
 	ldd -3,u  ; dividend
 	jsr print_d
 	ldx #s2
 	jsr print_string_x
 	lda -1,u   ; divisor
 	jsr print_a
+	
+	jsr print_space
+	jsr print_dollar
+	ldd -3,u  ; dividend
+	jsr print_a_hex
+	ldd -3,u  ; dividend
+	tfr b,a
+	jsr print_a_hex
+	ldx #s2
+	jsr print_string_x
+	jsr print_dollar
+	lda -1,u   ; divisor
+	jsr print_a_hex
+	
 	jsr print_cr
+	
 	ldx #s3
 	jsr print_string_x
 	lda -3,w    ; expected CC
@@ -365,27 +387,51 @@ compare_fail
 	jsr print_string_x
 	lda -2,w   ; expected result
 	jsr print_a
+	ldx #s9
+	jsr print_string_x
+	lda -2,w   ; expected result
+	jsr print_a_hex
 	jsr print_cr
+
 	ldx #s6
 	jsr print_string_x
 	ldx #compare
 	lda 1,x   ; actual result
 	jsr print_a
+	ldx #s9
+	jsr print_string_x
+	ldx #compare
+	lda 1,x   ; actual result
+	jsr print_a_hex
 	jsr print_cr
+
 	ldx #s7
 	jsr print_string_x
 	lda -1,w   ; expected result
 	jsr print_a
+	ldx #s9
+	jsr print_string_x
+	lda -1,w   ; expected result
+	jsr print_a_hex
 	jsr print_cr
+
 	ldx #s8
 	jsr print_string_x
 	ldx #compare
 	lda 2,x   ; actual result
 	jsr print_a
+	ldx #s9
+	jsr print_string_x
+	ldx #compare
+	lda 2,x   ; actual result
+	jsr print_a_hex
 	jsr print_cr
+
 
 	rts
 
+s0 fcc "CC INITIAL:  $"
+	fcb 0
 s1 fcc "DIVD COMPARE FAIL."
 	fcb 13,0
 s2 fcc " / "
@@ -394,13 +440,15 @@ s3 fcc "CC EXPECTED: $"
 	fcb 0
 s4 fcc "CC FOUND:    $"
 	fcb 0
-s5 fcc "(A) DIV EXPECTED: "
+s5 fcc "(A) MOD EXPECTED: "
 	fcb 0
-s6 fcc "(A) DIV FOUND:    "
+s6 fcc "(A) MOD FOUND:    "
 	fcb 0
-s7 fcc "(B) MOD EXPECTED: "
+s7 fcc "(B) DIV EXPECTED: "
 	fcb 0
-s8 fcc "(B) MOD FOUND:    "
+s8 fcc "(B) DIV FOUND:    "
+	fcb 0
+s9 fcc " $"
 	fcb 0
 
 print_string_x
@@ -448,6 +496,11 @@ print_space
 
 print_cr
 	lda #13
+	jsr [$a002]
+	rts
+	
+print_dollar
+	lda #'$
 	jsr [$a002]
 	rts
 
